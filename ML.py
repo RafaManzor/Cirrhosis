@@ -106,3 +106,20 @@ def knn(X_test, X_train, y_train, k):
     k_vecinos, y_et, indices = getNeighbors(X_train, y_train, X_test[i], k)   # Obtenemos los puntos más cercanos al punto i-ésimo de X_test
     y_new[i] = getPrediction(y_et)    # Hacemos la clasificación para el punto i-ésimo de X_test
   return y_new    # Regresamos el vector con las etiquetas predichas
+
+
+
+# definir plotKAccuracy()
+# Entrada: Conjuntos de datos X_test, X_train, etiquetas y_test y y_train y número maximo de vecinos k_max
+# Salida: Gráfica exactitud vs parámetro k
+
+def plotkAccuracy(X_test, X_train, y_test, y_train, k_max):
+  k = np.arange(k_max+1)
+  exactitud = np.zeros(k_max+1)
+  for i in range(1,k_max+1):
+    y_new = knn(X_test, X_train, y_train, k[i])
+    exactitud[i-1] = accuracy(y_new,y_test)
+  plt.plot(exactitud[:k_max],k[1:],"ro")
+  plt.xlabel('Exactitud')
+  plt.ylabel('k vecinos')
+  return exactitud[:k_max]
