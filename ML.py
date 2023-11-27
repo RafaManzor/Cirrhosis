@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
-import sys
 import matplotlib.pyplot as plt
 import numpy.random as nrd
+import heapq
 
 def getCentroids(X_data,y_data):
   g = np.unique(y_data)
@@ -39,21 +39,6 @@ def getDistances(x0, X_data, y_data):
   return [dist,y_label]
 
 
-def centroide(X,y,X_new):
-  X_centro, y_centro = getCentroids(X,y)
-
-  Nnew = len(X_new)
-  y_pred = np.full(Nnew,-1)
-
-  for i in range(Nnew):
-      dist = getDistances(X_new[i],X_centro, y_centro)
-
-      dist.sort(key = lambda pair: pair[0])
-      y_pred[i] = np.argmin(dist[1])
-
-  return y_pred
-
-
 def splitData(X,y,size_test = 0.2):
   N = len(X)
   i_arr = np.arange(N)
@@ -79,129 +64,45 @@ def accuracy(y_test, y_pred):
   return acc/N_test
 
 
-# Graficar puntos y centroides
-# Entrada: datos - X_data, centroides - X_centroids
-# Salida:  gráfica los puntos con los centroides
-def plotCentroids( X_data, y_data, X_centroids, y_centroids):
-    labels = np.unique(y_data)  # conjunto de etiquetas
-    clases =  ['setosa','versicolor','virginica']
-    colors  = ['tab:red', 'tab:green', 'tab:blue']
-    markers = ['.', '.', '.']
+def getNeighbors(X, y, p, k):
+  n = len(X)                      # Número de filas de X
+  y_et = np.zeros(n,dtype=int)    # Vector para guardar las etiquetas ordenadas de clasificación
+  k_vecinos = np.zeros(n)         # Vector para guardar las distancias ordenadas
 
-    for k in labels:
-        # seleccionar filas etiquetadas con la k-ésima categoría
-        X_points = X_data[ y_data == k]
-        plt.plot( X_points[:,0], X_points[:,1], ".", color=colors[k])
+  # Paso 1: Se obtienen las distancias del punto p a los puntos en X.
+  distancias = getDistances(p, X, y)    # Obtenemos las distancias
 
-        # graficar centroids
-        X_centro = X_centroids[ y_centroids == k][0]
-        plt.plot( X_centro[0], X_centro[1], "o", color=colors[k], label=clases[k] )
+  # Paso 2: Se obtienen los k vecinos más cercanos.
+  indices = np.argsort(distancias[:,0])   # Obtenemos los índices de las distancias ya ordenadas
+  for i in range(n):
+    m = indices[i]           # Obtenemos el i-ésimo índice más pequeño
+    k_vecinos[i] = distancias[m,0]     # Guardamos las distancias en el orden correspondiente (menor a mayor)
+    y_et[i] = distancias[m,-1]         # Asignamos la etiqueta correspondiente
 
-        plt.legend(loc="best")
-        
-        
-def assingCentroid( X_centro, y_centro, X_test ):
-    N_test   = len(X_test)                                # número de puntos nuevos
-    y_pred = np.full(N_test, -1)                          # arreglo de predicciones
-
-    for i in range(N_test):
-        # obtener distancias hacia los centroides
-        dist = getDistances(X_test[i], X_centro, y_centro)
-
-        # ordenar los pares (etiqueta, distancia) en orden creciente de acuerdo con la distancia
-        dist.sort( key = lambda pair: pair[0])
-
-        # asignar la etiqueta del centroide más cercano
-        y_pred[i] = dist[0][1]
-
-    return y_pred
-  
-  
-  
-  
-# Graficar puntos y centroides
-def plotPointsCentroids( X_points, X_centroids, y_centroids):
-    # graficar todos los puntos con "."
-    plt.plot( X_points[:,0], X_points[:,1], "." )
-
-    # graficar centroides con "o"
-    for x, y in zip(X_centroids, y_centroids):
-        plt.plot( x[0], x[1], "o", label="Clase " + str(y))
-
-    plt.legend(loc="best")
-    
-    
-    
-    
-def randomCentroids(X,k):
-  N = len(X)
-  filas = np.arange(N)
-  k_filas = nrd.choice(filas,k,replace = False)
-  X_centroids = np.copy(X[k_filas])
-  y_centroids = np.arange(k)
-  return X_centroids, y_centroids
-  
-  
-  
-# Graficar puntos por clase o sin clase
-def plotPoints( X_data, y_data, color=True ):
-    if color == True:
-        labels = np.unique(y_data)  # conjunto de etiquetas
-        for k in labels:
-            # seleccionar filas etiquetadas con la k-ésima categoría
-            X_points = X_data[ y_data == k]
-            plt.plot( X_points[:,0], X_points[:,1], ".", label=k )
-
-            plt.legend(loc="best")
-    else:
-        plt.plot( X_data[:,0], X_data[:,1], ".")
-        
-        
-        
-def init_centroids(X,k):
-  N,n = X.shape
-  X_centro = np.zeros([k,n])
-  y_centro = np.arange(k)
+  return k_vecinos[:k], y_et[:k], indices[:k]  # Regresamos las k distancias más cercanas, sus respectivas etiquetas e índices en el conjunto de datos
 
 
-  #primer centroid
-  X_centro[0] = X[nrd.randint(0,N+1)]
-  #Calcular k-1 centroides restantes
-  for i in range(1,k):
-    dist = np.zeros(N)
-    for p in range(N):
-      min_d = 100000
+def plotNeighbours(X, y, p, indices):
+  plotPoints(X, y, color=True)      # Graficamos todos los puntos del conjunto de datos
+  plt.plot(p[0],p[1], "ro", label="$P$")         # Graficamos el punto a clasificar
+  for i in range(k):
+    m = indices[i]        # Obtenemos el índice del i-ésimo punto más cercano
+    plt.plot(X[m,0],X[m,-1], "k*")  # Graficamos el i-ésimo punto mas cercano
+  plt.legend(loc="best")
 
-      for j in range(i): #ciclo para centroides
-        d = minkowski(X[p], X_centro[j],2)
-        min_d = d
 
-      dist[p] = min_d
+def getPrediction(etiquetas):
+  esp, rept = np.unique(etiquetas, return_counts=True) # Obtenemos las especies que hay en el vector de etiquetas y las veces que se repiten
+  especie = np.argmax(rept) # Obtenemos el máximo en las repeticiones
+  clase = esp[especie]      # Obtenemos el valor de la especie que se encuentra en la posición del máximo de repeticiones
 
-    X_centro[i] = X[i]
+  return clase
 
-  return X_centro, y_centro
-    
-    
 
-def Kmeans(X,k,MAXITE):
-  X_centro, y_centro = randomCentroids(X,k)
-
-  for i in range(MAXITE):
-    y_pred = assingCentroid(X_centro, y_centro, X)
-
-    X_centroids, y_centroids = getCentroids(X, y_pred)
-
-  return y_pred
-  
-  
-
-def Kmeans_pp(X,k,MAXITE):
-  X_centro, y_centro = init_centroids(X,k)
-
-  for i in range(MAXITE):
-    y_pred = assingCentroid(X_centro, y_centro, X)
-
-    X_centroids, y_centroids = getCentroids(X, y_pred)
-
-  return y_pred
+def knn(X_test, X_train, y_train, k):
+  n = len(X_test) # Obtenemos el número de filas del conjunto de datos X_test
+  y_new = np.zeros(n,dtype=int) # Creamos un vector de ceros para ir guardando las etiquetas asignadas
+  for i in range(n):
+    k_vecinos, y_et, indices = getNeighbors(X_train, y_train, X_test[i], k)   # Obtenemos los puntos más cercanos al punto i-ésimo de X_test
+    y_new[i] = getPrediction(y_et)    # Hacemos la clasificación para el punto i-ésimo de X_test
+  return y_new    # Regresamos el vector con las etiquetas predichas
